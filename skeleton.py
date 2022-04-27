@@ -28,20 +28,39 @@ def main(spark, netID):
     netID : string, netID of student to find files in HDFS
     '''
 
-    # Load the boats.txt and sailors.json data into DataFrame
-    trainsmall = spark.read.csv(f'hdfs:/user/{netID}/trainsmall.txt', mode="DROPMALFORMED", inferSchema=True, header = True)
+    # Load the data into DataFrame
+
+    small = spark.read.csv(f'hdfs:/user/xw1499/ratings_small.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
+    #Create Table View
+    small.createOrReplaceTempView('small')
+
+    large = spark.read.csv(f'hdfs:/user/xw1499/ratings_large.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
+    #Create Table View
+    large.createOrReplaceTempView('large')
+
+    trainsmall = spark.read.csv(f'hdfs:/user/xw1499/train_small.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
     trainsmall.printSchema()
     
     trainsmall.show()
 
-    als = ALS(maxIter=5, regParam=0.01, userCol="userId", itemCol="movieId", ratingCol="rating",
-              coldStartStrategy="drop")
+    als = ALS(maxIter=5, regParam=0.01, userCol="userId", itemCol="movieId", ratingCol="rating",coldStartStrategy="drop")
     model = als.fit(trainsmall)
     
     
-    testsmall = spark.read.csv(f'hdfs:/user/{netID}/testsmall.txt', mode="DROPMALFORMED", inferSchema=True, header = True)
+    testsmall = spark.read.csv(f'hdfs:/user/xw1499/test_small.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
     testsmall.printSchema()
     
+    ##########################Popularity Baseline Model###################################
+
+    popularity_small = spark.sql('SELECT movieId, AVG(rating) AS average_rating, count(userId) AS num_review FROM small GROUP BY movieId HAVING num_review > 30 ORDER BY average_rating DESC LIMIT 100 ')
+    print('Popularity model, small')
+    popularity_small.show()
+
+    popularity_large = spark.sql('SELECT movieId, AVG(rating) AS average_rating, count(userId) AS num_review FROM large GROUP BY movieId HAVING num_review > 30 ORDER BY average_rating DESC LIMIT 100 ')    
+    print('Popularity model, large') 
+    popularity_large.show()
+
+    ########################Latent Factor Model##########################################
     predictions = model.transform(testsmall)
     evaluator = RegressionEvaluator(metricName="rmse", labelCol="rating",
                                     predictionCol="prediction")
@@ -65,6 +84,7 @@ def main(spark, netID):
     movieRecs.show()
     userSubsetRecs.show()
     movieSubSetRecs.show()
+    #######################################################################
 
     spark.stop()
     
