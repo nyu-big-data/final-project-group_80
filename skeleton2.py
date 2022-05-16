@@ -42,24 +42,25 @@ def main(spark, netID):
 
     small = spark.read.csv(f'hdfs:/user/{netID}/train_small.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
     #Create Table View
-    small.createOrReplaceTempView('small')
+    #small.createOrReplaceTempView('small')
 
     # large = spark.read.csv(f'hdfs:/user/{netID}/ratings_large.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
     # #Create Table View
     # large.createOrReplaceTempView('large')
 
     trainsmall = spark.read.csv(f'hdfs:/user/{netID}/train_small.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
+    trainsmall.createOrReplaceTempView('trainsmall')
     trainsmall.printSchema()
     
     # trainsmall.show()
     
     
-    testsmall = spark.read.csv(f'hdfs:/user/{netID}/test_small.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
+    testsmall = spark.read.csv(f'hdfs:/user/{netID}/train_small.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
     testsmall.printSchema()
     
     ##########################Popularity Baseline Model###################################
 
-    popularity_small = spark.sql('SELECT movieId, AVG(rating) AS average_rating, count(userId) AS num_review FROM small GROUP BY movieId HAVING num_review > 30 ORDER BY average_rating DESC LIMIT 100 ')
+    popularity_small = spark.sql('SELECT movieId, AVG(rating) AS average_rating, count(userId) AS num_review FROM trainsmall GROUP BY movieId HAVING num_review > 30 ORDER BY average_rating DESC LIMIT 100 ')
     print('Popularity model, small')
     #popularity_small.show()
 
@@ -78,10 +79,20 @@ def main(spark, netID):
     metrics = RankingMetrics(prediction)
     
     print('Metrics')
-    print(metrics.precisionAt(1))
-    print(metrics.precisionAt(5))
-    print(metrics.precisionAt(10))
+    print("Precision at 1 ", metrics.precisionAt(1))
+    print("Precision at 5 " ,metrics.precisionAt(5))
+    print("Precision at 10 ", metrics.precisionAt(10))
+    print("Precision at 100 ", metrics.precisionAt(100))
+    print("Mean Average Precision: ")
     print(metrics.meanAveragePrecision)
+    
+    print("ndcgAt at 1: ", metrics.ndcgAt(1))
+    print("ndcgAt at 5: " ,metrics.ndcgAt(5))
+    print("ndcgAt at 10: ", metrics.ndcgAt(10))
+    print("ndcgAt at 100: ", metrics.ndcgAt(100))
+    print("ndcgAt: ")
+    print(metrics.ndcgAt)
+
     
     # popularity_large = spark.sql('SELECT movieId, AVG(rating) AS average_rating, count(userId) AS num_review FROM large GROUP BY movieId HAVING num_review > 30 ORDER BY average_rating DESC LIMIT 100 ')    
     # print('Popularity model, large') 
@@ -91,17 +102,50 @@ def main(spark, netID):
     als = ALS(maxIter=5, regParam=0.01, userCol="userId", itemCol="movieId", ratingCol="rating",coldStartStrategy="drop")
     model = als.fit(trainsmall)
     
-    users = trainsmall.select(als.getUserCol()).distinct()
+    users = testsmall.select(als.getUserCol()).distinct()
     userSubsetRecs = model.recommendForUserSubset(users, 100)
     
     
-    userSubsetRecs.sort('userId').show()
+    userSubsetRecs = userSubsetRecs.sort('userId')
     
-    usersubsettest=userSubsetRecs.limit(5).toPandas()
+    usersubsettest=list(userSubsetRecs.toPandas()['recommendations'])
+    
+    count = len(usersubsettest)
 
-    print(os.getcwd())
-    print(usersubsettest[1])
-    usersubsettest.to_csv('/home/hl4631/final-project-group_80',index=True, encoding='utf-8')
+    def Extract(lst):
+        return [item[0] for item in lst]    
+    
+    storage = []
+
+    for i, j in enumerate(usersubsettest): 
+        storage.append(Extract(usersubsettest[i]))
+
+    #print(storage)
+    
+    prediction = spark.sparkContext.parallelize(list(zip(watched,storage)))
+    
+    metrics = RankingMetrics(prediction)
+    
+    print('Metrics')
+    print("Precision at 1: ", metrics.precisionAt(1))
+    print("Precision at 5: " ,metrics.precisionAt(5))
+    print("Precision at 10: ", metrics.precisionAt(10))
+    print("Precision at 100: ", metrics.precisionAt(100))
+    print("Mean Average Precision: ")
+    print(metrics.meanAveragePrecision)
+    
+    print("ndcgAt at 1: ", metrics.ndcgAt(1))
+    print("ndcgAt at 5: " ,metrics.ndcgAt(5))
+    print("ndcgAt at 10: ", metrics.ndcgAt(10))
+    print("ndcgAt at 100: ", metrics.ndcgAt(100))
+    print("ndcgAt: ")
+    print(metrics.ndcgAt)
+    
+    #print(usersubsettest.iloc[1])
+    
+    
+    
+    #usersubsettest.to_csv('/home/hl4631/final-project-group_80',index=True, encoding='utf-8')
 
     
     
