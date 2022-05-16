@@ -27,6 +27,7 @@ import itertools
 import sklearn.model_selection
 from pyspark.mllib.evaluation import RankingMetrics
 from pyspark.sql.functions import collect_list
+from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
 
 
 def main(spark, netID):
@@ -40,7 +41,7 @@ def main(spark, netID):
     
     # Load the data into DataFrame
 
-    small = spark.read.csv(f'hdfs:/user/{netID}/train_small.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
+    #small = spark.read.csv(f'hdfs:/user/{netID}/train_big.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
     #Create Table View
     #small.createOrReplaceTempView('small')
 
@@ -52,10 +53,13 @@ def main(spark, netID):
     trainsmall.createOrReplaceTempView('trainsmall')
     trainsmall.printSchema()
     
+    valsmall = spark.read.csv(f'hdfs:/user/{netID}/val_small.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
+    valsmall.printSchema()
+    
     # trainsmall.show()
     
     
-    testsmall = spark.read.csv(f'hdfs:/user/{netID}/train_small.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
+    testsmall = spark.read.csv(f'hdfs:/user/{netID}/test_small.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
     testsmall.printSchema()
     
     ##########################Popularity Baseline Model###################################
@@ -64,7 +68,7 @@ def main(spark, netID):
     print('Popularity model, small')
     #popularity_small.show()
 
-    print(list(popularity_small.select('movieId').toPandas()['movieId']))
+    #print(list(popularity_small.select('movieId').toPandas()['movieId']))
     TopMovieList = list(popularity_small.select('movieId').toPandas()['movieId'])
     
     watch = trainsmall.groupby('userId').agg(collect_list('movieId')).alias('watchedmovies').sort('userId').collect()
@@ -99,18 +103,20 @@ def main(spark, netID):
     # popularity_large.show()
 
     #######################Latent Factor Model##########################################
-    als = ALS(maxIter=5, regParam=0.01, userCol="userId", itemCol="movieId", ratingCol="rating",coldStartStrategy="drop")
+    als = ALS(maxIter=5, regParam=0.01, userCol="userId", itemCol="movieId", ratingCol="rating",nonnegative = True, coldStartStrategy="drop")
     model = als.fit(trainsmall)
     
-    users = testsmall.select(als.getUserCol()).distinct()
+    users = valsmall.select(als.getUserCol()).distinct()
     userSubsetRecs = model.recommendForUserSubset(users, 100)
     
     
     userSubsetRecs = userSubsetRecs.sort('userId')
     
+    userSubsetRecs.limit(100).show()
+    
     usersubsettest=list(userSubsetRecs.toPandas()['recommendations'])
     
-    count = len(usersubsettest)
+    #count = len(usersubsettest)
 
     def Extract(lst):
         return [item[0] for item in lst]    
