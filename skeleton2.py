@@ -28,6 +28,7 @@ import sklearn.model_selection
 from pyspark.mllib.evaluation import RankingMetrics
 from pyspark.sql.functions import collect_list
 from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
+import time
 
 
 def main(spark, netID):
@@ -48,18 +49,19 @@ def main(spark, netID):
     # large = spark.read.csv(f'hdfs:/user/{netID}/ratings_large.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
     # #Create Table View
     # large.createOrReplaceTempView('large')
+    tic = time.perf_counter()
 
-    trainsmall = spark.read.csv(f'hdfs:/user/{netID}/train_small.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
+    trainsmall = spark.read.csv(f'hdfs:/user/{netID}/train_bignew.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
     trainsmall.createOrReplaceTempView('trainsmall')
     trainsmall.printSchema()
     
-    valsmall = spark.read.csv(f'hdfs:/user/{netID}/val_small.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
+    valsmall = spark.read.csv(f'hdfs:/user/{netID}/val_big.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
     valsmall.printSchema()
     
     # trainsmall.show()
     
     
-    testsmall = spark.read.csv(f'hdfs:/user/{netID}/test_small.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
+    testsmall = spark.read.csv(f'hdfs:/user/{netID}/test_big.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
     testsmall.printSchema()
     
     ##########################Popularity Baseline Model###################################
@@ -108,94 +110,98 @@ def main(spark, netID):
     def Extract(lst):
         return [item[0] for item in lst]  
     
-    ranklist = [5, 10, 15, 20]
-    iterlist = [3, 5, 10, 15]
-    regparamlist = [.05, .1, 1]
+    # ranklist = [5, 10, 15, 20]
+    # iterlist = [3, 5, 10, 15]
+    # regparamlist = [.005, .01, 0.02]
     
-    storemap = []
-    storecount = []
+    # storemap = []
+    # storecount = []
     
-    #Changes this to validation set. If we comment this whole latent factor set out, then we are using the testset.
+    # #Changes this to validation set. If we comment this whole latent factor set out, then we are using the testset.
     
-    watch = valsmall.groupby('userId').agg(collect_list('movieId')).alias('watchedmovies').sort('userId').collect()
-    testsmallprocessed = spark.createDataFrame(watch).select('collect_list(movieId)')
-    watched = list(testsmallprocessed.select('collect_list(movieId)').toPandas()['collect_list(movieId)'])
+    # watch = valsmall.groupby('userId').agg(collect_list('movieId')).alias('watchedmovies').sort('userId').collect()
+    # testsmallprocessed = spark.createDataFrame(watch).select('collect_list(movieId)')
+    # watched = list(testsmallprocessed.select('collect_list(movieId)').toPandas()['collect_list(movieId)'])
     
-    for x in ranklist:
-        for y in iterlist:
-            for z in regparamlist:
-                print(x)
-                print(y)
-                print(z)
-                als = ALS(rank = x, maxIter=y, regParam=z,userCol="userId", itemCol="movieId", ratingCol="rating",nonnegative = True, implicitPrefs = False, coldStartStrategy="drop")
-                model = als.fit(trainsmall)
-                users = valsmall.select(als.getUserCol()).distinct()
-                userSubsetRecs = model.recommendForUserSubset(users, 100)
-                userSubsetRecs = userSubsetRecs.sort('userId')
-                usersubsettest=list(userSubsetRecs.toPandas()['recommendations'])
-                storage = []
-                for i, j in enumerate(usersubsettest): 
-                    storage.append(Extract(usersubsettest[i]))
-                prediction = spark.sparkContext.parallelize(list(zip(watched,storage)))
-                metrics = RankingMetrics(prediction)
-                print("Mean Average Precision: ", metrics.meanAveragePrecision)
-                print("ndcgAt at 100: ", metrics.ndcgAt(100))
-                storemap.append(metrics.meanAveragePrecision)
-                storecount.append("Rank: " + str(x)+ "Iterations: " + str(y)+ "Regularization Parameter: " +str(z))
+    # for x in ranklist:
+    #     for y in iterlist:
+    #         for z in regparamlist:
+    #             print(x)
+    #             print(y)
+    #             print(z)
+    #             als = ALS(rank = x, maxIter=y, regParam=z,userCol="userId", itemCol="movieId", ratingCol="rating",nonnegative = True, implicitPrefs = False, coldStartStrategy="drop")
+    #             model = als.fit(trainsmall)
+    #             users = valsmall.select(als.getUserCol()).distinct()
+    #             userSubsetRecs = model.recommendForUserSubset(users, 100)
+    #             userSubsetRecs = userSubsetRecs.sort('userId')
+    #             usersubsettest=list(userSubsetRecs.toPandas()['recommendations'])
+    #             storage = []
+    #             for i, j in enumerate(usersubsettest): 
+    #                 storage.append(Extract(usersubsettest[i]))
+    #             prediction = spark.sparkContext.parallelize(list(zip(watched,storage)))
+    #             metrics = RankingMetrics(prediction)
+    #             print("Mean Average Precision: ", metrics.meanAveragePrecision)
+    #             print("ndcgAt at 100: ", metrics.ndcgAt(100))
+    #             storemap.append(metrics.meanAveragePrecision)
+    #             storecount.append("Rank: " + str(x)+ "Iterations: " + str(y)+ "Regularization Parameter: " +str(z))
     
-    indextouse = np.argmin(storemap)
-    print(np.amin(storemap))
-    print(storecount[indextouse])
+    # indextouse = np.argmin(storemap)
+    # print(np.amax(storemap))
+    # print(storecount[indextouse])
+    
+
     
     #######################################################################################################
     
     
-    # als = ALS(maxIter=3, regParam=0.1,rank =5, userCol="userId", itemCol="movieId", ratingCol="rating",nonnegative = True, implicitPrefs = False, coldStartStrategy="drop")
+    als = ALS(maxIter=10, regParam=0.05,rank =15, userCol="userId", itemCol="movieId", ratingCol="rating",nonnegative = True, implicitPrefs = False, coldStartStrategy="drop")
 
-    # model = als.fit(trainsmall)
+    model = als.fit(trainsmall)
     
-    # users = testsmall.select(als.getUserCol()).distinct()
-    # userSubsetRecs = model.recommendForUserSubset(users, 100)
+    users = testsmall.select(als.getUserCol()).distinct()
+    userSubsetRecs = model.recommendForUserSubset(users, 100)
     
     
-    # userSubsetRecs = userSubsetRecs.sort('userId')
+    userSubsetRecs = userSubsetRecs.sort('userId')
     
-    # userSubsetRecs.limit(100).show()
+    userSubsetRecs.limit(100).show()
     
-    # usersubsettest=list(userSubsetRecs.toPandas()['recommendations'])
+    usersubsettest=list(userSubsetRecs.toPandas()['recommendations'])
     
-    # #count = len(usersubsettest)
+    #count = len(usersubsettest)
 
   
     
-    # storage = []
+    storage = []
 
-    # for i, j in enumerate(usersubsettest): 
-    #     storage.append(Extract(usersubsettest[i]))
+    for i, j in enumerate(usersubsettest): 
+        storage.append(Extract(usersubsettest[i]))
 
-    # #print(storage)
+    #print(storage)
     
-    # prediction = spark.sparkContext.parallelize(list(zip(watched,storage)))
+    prediction = spark.sparkContext.parallelize(list(zip(watched,storage)))
     
-    # metrics = RankingMetrics(prediction)
+    metrics = RankingMetrics(prediction)
     
-    # print('Metrics')
-    # print("Precision at 1: ", metrics.precisionAt(1))
-    # print("Precision at 5: " ,metrics.precisionAt(5))
-    # print("Precision at 10: ", metrics.precisionAt(10))
-    # print("Precision at 100: ", metrics.precisionAt(100))
-    # print("Mean Average Precision: ")
-    # print(metrics.meanAveragePrecision)
+    print('Metrics')
+    print("Precision at 1: ", metrics.precisionAt(1))
+    print("Precision at 5: " ,metrics.precisionAt(5))
+    print("Precision at 10: ", metrics.precisionAt(10))
+    print("Precision at 100: ", metrics.precisionAt(100))
+    print("Mean Average Precision: ")
+    print(metrics.meanAveragePrecision)
     
-    # print("ndcgAt at 1: ", metrics.ndcgAt(1))
-    # print("ndcgAt at 5: " ,metrics.ndcgAt(5))
-    # print("ndcgAt at 10: ", metrics.ndcgAt(10))
-    # print("ndcgAt at 100: ", metrics.ndcgAt(100))
-    # print("ndcgAt: ")
-    # print(metrics.ndcgAt)
+    print("ndcgAt at 1: ", metrics.ndcgAt(1))
+    print("ndcgAt at 5: " ,metrics.ndcgAt(5))
+    print("ndcgAt at 10: ", metrics.ndcgAt(10))
+    print("ndcgAt at 100: ", metrics.ndcgAt(100))
+    print("ndcgAt: ")
+    print(metrics.ndcgAt)
     
+    toc = time.perf_counter()
+    print(f"Finished program in {toc - tic:0.4f} seconds")
     
-    print('Values for #4:')
+    print('Finished')
     # userIDsubsettest=list(userSubsetRecs.toPandas()['userId'])
     
     # BadUserRankings = []
