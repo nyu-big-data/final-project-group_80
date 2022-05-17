@@ -13,6 +13,7 @@ from lenskit import crossfold as xf
 from lenskit.algorithms import Recommender, als, item_knn as knn
 from lenskit import topn
 import pandas as pd
+import time
 %matplotlib inline
 
 # read in small dataset
@@ -41,10 +42,14 @@ def eval(aname, algo, train, test):
 
 all_recs = []
 test_small = []
+#Start timer here
+tic = time.perf_counter()
 for train, test in xf.partition_users(data_small, 5, xf.SampleFrac(0.2)):
     test_small.append(test)
     all_recs.append(eval('ALS', algo_als, train, test))
-
+#End timer here 
+toc = time.perf_counter() 
+print(f"Finished program in {toc - tic:0.4f} seconds")
 all_recs = pd.concat(all_recs, ignore_index=True)
 all_recs.head()
 
@@ -53,10 +58,10 @@ all_recs.shape
 test_small = pd.concat(test_small, ignore_index=True)
 
 rla = topn.RecListAnalysis()
-rla.add_metric(map)
+rla.add_metric(topn.precision)
 results = rla.compute(all_recs, test_small)
 results.head()
-
+results.to_csv('extention1_result/precision_small.csv')
 
 
 
