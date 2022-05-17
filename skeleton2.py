@@ -49,36 +49,37 @@ def main(spark, netID):
     # #Create Table View
     # large.createOrReplaceTempView('large')
 
-    trainsmall = spark.read.csv(f'hdfs:/user/{netID}/train_small.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
+    trainsmall = spark.read.csv(f'hdfs:/user/{netID}/train_big.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
     trainsmall.createOrReplaceTempView('trainsmall')
     trainsmall.printSchema()
     
-    valsmall = spark.read.csv(f'hdfs:/user/{netID}/val_small.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
+    valsmall = spark.read.csv(f'hdfs:/user/{netID}/val_big.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
     valsmall.printSchema()
     
     # trainsmall.show()
     
     
-    testsmall = spark.read.csv(f'hdfs:/user/{netID}/test_small.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
+    testsmall = spark.read.csv(f'hdfs:/user/{netID}/test_big.csv', mode="DROPMALFORMED", inferSchema=True, header = True)
     testsmall.printSchema()
     
     ##########################Popularity Baseline Model###################################
 
     popularity_small = spark.sql('SELECT movieId, AVG(rating) AS average_rating, count(userId) AS num_review FROM trainsmall GROUP BY movieId HAVING num_review > 30 ORDER BY average_rating DESC LIMIT 100 ')
     print('Popularity model, small')
-    #popularity_small.show()
+    popularity_small.show()
 
     #print(list(popularity_small.select('movieId').toPandas()['movieId']))
     TopMovieList = list(popularity_small.select('movieId').toPandas()['movieId'])
     
-    watch = trainsmall.groupby('userId').agg(collect_list('movieId')).alias('watchedmovies').sort('userId').collect()
-    trainsmallprocessed = spark.createDataFrame(watch).select('collect_list(movieId)')
-    watched = list(trainsmallprocessed.select('collect_list(movieId)').toPandas()['collect_list(movieId)'])
+    watch = testsmall.groupby('userId').agg(collect_list('movieId')).alias('watchedmovies').sort('userId').collect()
+    testsmallprocessed = spark.createDataFrame(watch).select('collect_list(movieId)')
+    watched = list(testsmallprocessed.select('collect_list(movieId)').toPandas()['collect_list(movieId)'])
     
     TopMovieList = [TopMovieList]*len(watched)
 
     
     prediction = spark.sparkContext.parallelize(list(zip(watched,TopMovieList)))
+    
     
     metrics = RankingMetrics(prediction)
     
@@ -102,11 +103,58 @@ def main(spark, netID):
     # print('Popularity model, large') 
     # popularity_large.show()
 
-    #######################Latent Factor Model##########################################
-    als = ALS(maxIter=5, regParam=0.01, userCol="userId", itemCol="movieId", ratingCol="rating",nonnegative = True, coldStartStrategy="drop")
+    ######################Latent Factor Model##########################################
+    
+    def Extract(lst):
+        return [item[0] for item in lst]  
+    
+    # ranklist = [5, 10, 15, 20]
+    # iterlist = [3, 5, 10, 15]
+    # regparamlist = [.05, .1, 1]
+    
+    # storemap = []
+    # storecount = []
+    
+    # #Changes this to validation set. If we comment this whole latent factor set out, then we are using the testset.
+    
+    # watch = valsmall.groupby('userId').agg(collect_list('movieId')).alias('watchedmovies').sort('userId').collect()
+    # testsmallprocessed = spark.createDataFrame(watch).select('collect_list(movieId)')
+    # watched = list(testsmallprocessed.select('collect_list(movieId)').toPandas()['collect_list(movieId)'])
+    
+    # for x in ranklist:
+    #     for y in iterlist:
+    #         for z in regparamlist:
+    #             print(x)
+    #             print(y)
+    #             print(z)
+    #             als = ALS(rank = x, maxIter=y, regParam=z,userCol="userId", itemCol="movieId", ratingCol="rating",nonnegative = True, implicitPrefs = False, coldStartStrategy="drop")
+    #             model = als.fit(trainsmall)
+    #             users = valsmall.select(als.getUserCol()).distinct()
+    #             userSubsetRecs = model.recommendForUserSubset(users, 100)
+    #             userSubsetRecs = userSubsetRecs.sort('userId')
+    #             usersubsettest=list(userSubsetRecs.toPandas()['recommendations'])
+    #             storage = []
+    #             for i, j in enumerate(usersubsettest): 
+    #                 storage.append(Extract(usersubsettest[i]))
+    #             prediction = spark.sparkContext.parallelize(list(zip(watched,storage)))
+    #             metrics = RankingMetrics(prediction)
+    #             print("Mean Average Precision: ", metrics.meanAveragePrecision)
+    #             print("ndcgAt at 100: ", metrics.ndcgAt(100))
+    #             storemap.append(metrics.meanAveragePrecision)
+    #             storecount.append("Rank: " + str(x)+ "Iterations: " + str(y)+ "Regularization Parameter: " +str(z))
+    
+    # indextouse = np.argmin(storemap)
+    # print(np.amin(storemap))
+    # print(storecount[indextouse])
+    
+    #######################################################################################################
+    
+    
+    als = ALS(maxIter=3, regParam=0.1,rank =5, userCol="userId", itemCol="movieId", ratingCol="rating",nonnegative = True, implicitPrefs = False, coldStartStrategy="drop")
+
     model = als.fit(trainsmall)
     
-    users = valsmall.select(als.getUserCol()).distinct()
+    users = testsmall.select(als.getUserCol()).distinct()
     userSubsetRecs = model.recommendForUserSubset(users, 100)
     
     
@@ -118,8 +166,7 @@ def main(spark, netID):
     
     #count = len(usersubsettest)
 
-    def Extract(lst):
-        return [item[0] for item in lst]    
+  
     
     storage = []
 
@@ -146,6 +193,26 @@ def main(spark, netID):
     print("ndcgAt at 100: ", metrics.ndcgAt(100))
     print("ndcgAt: ")
     print(metrics.ndcgAt)
+    
+    
+    print('Values for #4')
+    # userIDsubsettest=list(userSubsetRecs.toPandas()['userId'])
+    
+    # BadUserRankings = []
+    # LowestValues = []
+    # for a in range(len(watched)):
+    #     prediction = spark.sparkContext.parallelize(list(zip(watched[a],storage[a])))
+    #     metrics = RankingMetrics(prediction)
+    #     LowestValues.append(metrics.meanAveragePrecision)
+    #     BadUserRankings.append(userIDsubsettest[a])
+    
+    # pandasdf = pd.DataFrame(list(zip(BadUserRankings, LowestValues)),columns=['USERSLIST','MAPVAL'])
+    
+    # pandasdf = pandasdf.sort_values(by='MAPVAL', ascending=False) 
+    
+    # display(pandasdf)
+    #pandasdf.show()
+    
     
     #print(usersubsettest.iloc[1])
     
