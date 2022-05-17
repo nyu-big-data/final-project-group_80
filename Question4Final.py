@@ -15,7 +15,7 @@ from lenskit import topn
 import time
 import pandas as pd
 
-data_small = pd.read_csv('ratings.csv')[['userId', 'movieId', 'rating']]
+data_small = pd.read_csv('fullratings.csv')[['userId', 'movieId', 'rating']]
 
 
 # rename cols
@@ -68,7 +68,7 @@ rla = topn.RecListAnalysis()
 rla.add_metric(topn.precision)
 results = rla.compute(all_recs, test_small)
 
-results.to_csv('resultsprecise.csv')
+results.to_csv('resultsprecisest.csv')
 
 
 
