@@ -128,3 +128,7 @@ Top ten user recommendations for a specified set of movies
 |   3175|[[485, 9.673055],...|
 |   4519|[[147, 7.827527],...|
 +-------+--------------------+
+
+______________________________________________________________
+Extention 1
+Running time for small data: 44.2954 seconds
