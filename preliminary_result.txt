@@ -131,4 +131,20 @@ Top ten user recommendations for a specified set of movies
 
 ______________________________________________________________
 Extention 1
-Running time for small data: 44.2954 seconds
+Running time for small data: 8.8735 seconds.
+Running time for large data: 527.0124 seconds
+
+Accuracy of LensKit ALS for each user
+
++------+-------------+
+| User |  precision  |
++------+-------------+
+|   1  |    0.07     |
+|   2  |    0.01     |
+|   3  |    0.00     |
+|   4  |    0.06     |
+|   5  |    0.01     |
++------+-------------+
+only showing top 5 rows
+
+
