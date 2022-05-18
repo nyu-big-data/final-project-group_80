@@ -55,37 +55,38 @@ Popularity model, large
 +-------+------------------+----------+  
 only showing top 20 rows                 
 
-Root-mean-square error = 1.142096030699293
+Popularity Model Accuracy for Small Dataset
 
-______________________________________________________
-ALS
-Small?
-Metrics
-Precision at (what is equal to)1  0.09025496974935161
+Precision at (query =) 1  0.1934426229508197
+Precision at 5  0.26754098360655754
+Precision at 10  0.24688524590163938
+Precision at 100  0.07308196721311473
+
+Mean Average Precision:
+0.02870624606484546
+
+ndcgAt at 1:  0.1934426229508197
+ndcgAt at 5:  0.2574756780563214
+ndcgAt at 10:  0.24670308232156846
+ndcgAt at 100:  0.10139557862279076
+
+Popularity Model Accuracy for Large Dataset
+Precision at 1  0.09025496974935161
 Precision at 5  0.09518150388936904
 Precision at 10  0.08603932584269675
 Precision at 100  0.020472342264477177
+
 Mean Average Precision:
 0.005962265319585138
+
 ndcgAt at 1:  0.09025496974935163
 ndcgAt at 5:  0.09445827299088236
 ndcgAt at 10:  0.0884879452824084
 ndcgAt at 100:  0.031302748196907954
 
-Large ?
-Metrics
-Precision at 1:  0.05139971472618033
-Precision at 5:  0.04650395493249958
-Precision at 10:  0.03897085308398286
-Precision at 100:  0.008996715028743498
-Mean Average Precision:
-0.0023623162200509425
-ndcgAt at 1:  0.05139971472618034
-ndcgAt at 5:  0.047698409668905095
-ndcgAt at 10:  0.04211414363364109
-ndcgAt at 100:  0.014257252120749525
+______________________________________________________
 
-Top ten movie recommendations for each user.
+ALS Model: Top ten movie recommendations for each user.
 +------+--------------------+
 |userId|     recommendations|
 +------+--------------------+
@@ -112,11 +113,39 @@ Top ten movie recommendations for each user.
 +------+--------------------+
 only showing top 20 rows
 
+ALS Accuracy for Small Dataset
+Precision at 1:  0.042622950819672135
+Precision at 5:  0.05639344262295083
+Precision at 10:  0.05639344262295082
+Precision at 100:  0.02285245901639344
+
+Mean Average Precision:
+0.004378807425250952
+
+ndcgAt at 1:  0.04262295081967214
+ndcgAt at 5:  0.05591108221979435
+ndcgAt at 10:  0.056226336183088595
+ndcgAt at 100:  0.028981982326224984
+
+ALS Accuracy for Large Dataset
+Metrics
+Precision at 1:  0.05139971472618033
+Precision at 5:  0.04650395493249958
+Precision at 10:  0.03897085308398286
+Precision at 100:  0.008996715028743498
+
+Mean Average Precision:
+0.0023623162200509425
+
+ndcgAt at 1:  0.05139971472618034
+ndcgAt at 5:  0.047698409668905095
+ndcgAt at 10:  0.04211414363364109
+ndcgAt at 100:  0.014257252120749525
 
 ______________________________________________________________
 Extension 1
-Running time for small data: 8.8735 seconds.
-Running time for large data: 527.0124 seconds
+Single Machine Running time for small data: 8.8735 seconds.
+Single Machine Running time for large data: 527.0124 seconds
 
 Accuracy of LensKit ALS for each user
 
@@ -131,4 +160,4 @@ Accuracy of LensKit ALS for each user
 +------+-------------+
 only showing top 5 rows
 
-
+Extension 2 Results are in the paper
